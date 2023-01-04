@@ -1,0 +1,7 @@
+import re
+def extractstr(s):
+    # Use a regular expression with a negative lookahead assertion to find all contiguous sequences of non-space characters that are not 1 or 5
+    return "".join(re.findall(r"(?!1|5)\S+", s))
+
+# Test the function
+print(extractstr("move 1 from 1 to 5"))  # Output: ['move', 'from', 'to']
