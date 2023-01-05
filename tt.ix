@@ -1,7 +1,234 @@
-import re
-def extractstr(s):
-    # Use a regular expression with a negative lookahead assertion to find all contiguous sequences of non-space characters that are not 1 or 5
-    return "".join(re.findall(r"(?!1|5)\S+", s))
+(var cmds "Examples: \"heal XxPlayerxX\" or \"heal Xx\"
+  \"cmds [topic]\" - display this, or, if filled with a topic, display information about that topic
+  Topic:
+  -> modes
+  -> maps
+  -> lighting-presets
+  -> camera-modes
+  \"mode [game mode]\" - changes your game mode to the one you set
+  \"map [map]\" - changes the map to the one you set
+  \"light [light preset]\" - changes the light preset to the one you set
+  \"camera-mode [player] \" - changes the camera mode of a player
+  \"team security [player]\" or \"team insurgent [player]\" - switch someone to either team, if in blank it will switch the sender
+  \"heal\" or \"heal [player]\" - heal you or a player fully
+  \"drone\" or \"drone [player]\" - drone strike on your or player
+  \"brrrt [player]\" - airstrike on player
+  \"flare\" or \"flare [player]\" - fire a flare above yourself or player
+  \"boom [player]\" - kill player with an explosion
+  \"boom near [player]\" - explosion near the player (non-lethal)
+  \"tp [player] here\" or \"tp to [player]\" or \"tp [player1] to [player2]\"
+  \"plant\" - plant claymore where you stand"
+  mode-presets "Gamemodes avialable:
+  domination - domminate 3 control points for summing points to your team
+  koth - dominate the control point for summing points to your team
+  push_waves - defend/attack a control point and if attacked succesfully, another control point will pop up. Respawns happen in waves
+  push_tickets - same thing but respawns hapen with tickets
+  none - no idea, its just in the API, if you happen to know what this is, please open an issue on the repo
+  example - same thing
+  tdm - team death match, each enemy kill is a point to your team
+  rtdm - randomized team death match, tdm but you spawn randomly and each 5 kills you get healed ;not in the API"
+  lighting-presets "Lighting presets avialable, self explanatory:
+  blank
+  foggy
+  day
+  spooktober
+  darkworld
+  dl_baseplate
+  dl_builder
+  demo_claustrophobic_lighting
+  dl_afghanistan_morning
+  dl_shipment"
+  camera-modes "Camera modes avialable, self explanatory:
+  Default
+  Freecam
+  Frozen
+  Tperson")
 
-# Test the function
-print(extractstr("move 1 from 1 to 5"))  # Output: ['move', 'from', 'to']
+(function rand-circle-point position radius
+  (var r radius)
+  (-> (rand (* 2 PI))
+      (fn a [(cos a) 0 (sin a)])
+      (map (* r))
+     @(map + position)))
+
+(function is-near? x0 y0 z0 x1 y1 z1 dist
+  (> dist (sqrt
+    (+ (** (- x0 x1))
+       (** (- y0 y1))
+       (** (- z0 z1))))))
+
+(function n. name
+  (var n name)
+  (find (fn p (.. starts? (map lower-case [n p])))
+        (alive-players)))
+
+(function alive-players
+  (filter #((str "dl.players." % ".is_alive"))
+          (dl.list_players)))
+
+(function grenade pos
+  (dl.util.explosion pos "TestGrenade"))
+
+(var props {:pos "position" :team "team" :hp "health"})
+(function plr who key value
+  (let prop (props key)
+       evar (str "dl.players." who))
+  (if (= key :alive?)
+      (return ((str "dl.players." who ".is_alive"))))
+  (catch
+    (if value
+      (do ((str "$" evar "." prop) value) :success)
+      (prop evar))
+    (print "plr errors: " errors)))
+
+(function change-game mode (catch (eval (str "(dl.util.set_gamemode \"" mode "\")")) (dl.util.fmessage "Uknown gamemode"))) ; add rtdm
+(function change-maps maps (catch (eval (str "(dl.util.set_map \"" maps"\")")) (dl.util.fmessage "Uknown map")))
+(function change-lighting light (catch (eval (str "(dl.util.set_preset \"" light"\")")) (dl.util.fmessage "Uknown lighting preset")))
+(function change-camera mode player (catch (eval (str "(dl.players." player ".set_camera_mode \"" mode "\")")) (dl.util.fmessage "Uknown camera mode and/or uknown player")))
+
+(function rtdm
+  (dl.util.set_gamemode "tdm")
+)
+
+(function monologue messages delay
+  (var d (or delay 1))
+  (map (fn msg (dl.util.fmessage msg)
+               (wait d))
+       messages))
+
+(function teleport from to
+  (let pos (plr to :pos))
+  (if! pos (return))
+  (if (plr from :pos pos)
+      (str from " teleported to " to)))
+
+(function heal who
+  (if (plr who :hp 100)
+      (str "Healed " who)))
+
+(function team-cmd who team-name
+  (let name ((starts? "i" team-name) "insurgent" "security"))
+  (if (plr who :team name)
+      (str who " now " name)))
+
+(function boom who is-near
+  (let pos (plr who :pos))
+  (if! pos (return))
+  (-> (is-near (rand-circle-point pos 48) pos)
+     #(dl.util.explosion % "TestGrenade"))
+  (str "Exploded " (if is-near "near " "") who))
+
+(function flare who
+  (-> (plr who :pos)
+     @(map + [0 100 0])
+      (fn pos (dl.util.explosion pos "TestGrenade")))
+  (str "Fired flare above " who))
+
+(function brrr who
+  (if! (plr who :alive?) (return))
+  (monologue [
+    (str "Airstrike target locked: " who)
+    "Coming in hot in 5" "4" "3" "2..."])
+  (wait 1)
+  (let pos (plr who :pos))
+  (let i 0)
+  (while (< i 100)
+    (let! i inc)
+    (wait .01)
+    (-> [(rand 10) 0 (rand 10)]
+       @(map + [(- (* i 2) 100) 0 0] pos)
+        grenade))
+  (str who " has been brrr'd."))
+
+(function drone who
+  (if! (plr who :alive?) (return))
+  (let pos (plr who :pos))
+  (monologue [
+    (str "Position locked: " who)
+    "Drone strike in 4" "3" "2..."
+  ])
+  (wait 1)
+  (let i 0 lim (rand 5 10))
+  (while (< i lim)
+    (let! i inc)
+    (wait .25)
+    (-> [(rand -50 50) 30 (rand -50 50)]
+       @(map + pos)
+        grenade))
+  "Drone strike complete.")
+
+;;;;; claymores
+; (monologue (map plant (alive-players)) .1)
+
+;{[x y z] {:team name :by name}}
+(if! ((symbols) "plants")
+  (var plants {}))
+
+(function plant who
+  (let pos (plr who :pos))
+  (if! pos (return))
+  (var! plants into {pos {:team (plr who :team) :by who}})
+  (str "Claymore planted by " who ". " (len plants) " set."))
+
+(function player-claymore player claymore
+  (let [plant-pos info] claymore
+       player-pos       (plr player :pos)
+       player-team      (plr player :team)
+       plant-team       (:team info))
+  (when (and (.. is-near? plant-pos player-pos 30)
+             (!= player-team plant-team))
+    (var! plants push plant-pos)
+    (grenade plant-pos)
+    (var p player b (:by info))
+    (-> (str (len plants) " left.")
+       @(str p " tripped " b "'s claymore! ")
+        fmessage)))
+
+(function on-tick
+  ;check for players near claymores
+  (for player-claymore (alive-players) plants))
+
+(ticked.kill)
+(ticked.connect on-tick)
+;;;;;
+
+(function command sender msg
+  (var parts (split " " (lower-case msg))
+       [_ b c d] parts)
+  (match parts
+    ["cmds"]          cmds
+    ["heal"]          (heal sender)
+    ["heal" _]        (heal (n. b))
+    ["team" _]        (team-cmd sender b)
+    ["team"]          (str sender " is " (plr sender :team))
+    ["tp" _ "here"]   (teleport (n. b) sender)
+    ["tp" _ "to" _]   (teleport (n. b) (n. d))
+    ["tp" "to" _]     (teleport sender (n. c))
+    ["boom" "near" _] (boom (n. c) true)
+    ["boom" _]        (boom (n. b) false)
+    ["flare"]         (flare sender)
+    ["flare" _]       (flare (n. b))
+    ["brrrt" _]       (brrr (n. b))
+    ["drone"]         (drone sender)
+    ["drone" _]       (drone (n. b))
+    ["plant"]         (plant sender)
+    ["mode" _]        (change-game b)
+    ["map" _]         (change-maps b)
+    ["light" _]       (change-lighting)
+    ["camera-mode" _ _] (change-camera b c)
+    :not-a-command))
+
+(function fmessage m (print m) (dl.util.fmessage m))
+
+(function on-message sender _ msg
+  (let result (command sender msg))
+  (when (!= result :not-a-command)
+    (fmessage
+      (if (starts? "(" msg)
+        (catch (eval msg) errors)
+        (or result "Didn't work, maybe player is dead.")))))
+
+(dl.events.on_chat_message.kill)
+(dl.events.on_chat_message.connect on-message)
+(dl.util.fmessage "Loaded Insitux chatbot! Chat \"cmds\" to see list of available commands.
+Note: this is a CHAT bot, you send the commands in the chat.")
