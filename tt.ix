@@ -8,7 +8,7 @@
   \"mode [game mode]\" - changes your game mode to the one you set
   \"map [map]\" - changes the map to the one you set
   \"light [light preset]\" - changes the light preset to the one you set
-  \"camera-mode [player] \" - changes the camera mode of a player
+  \"camera-mode [mode] [player] \" - changes the camera mode of a player
   \"team security [player]\" or \"team insurgent [player]\" - switch someone to either team, if in blank it will switch the sender
   \"heal\" or \"heal [player]\" - heal you or a player fully
   \"drone\" or \"drone [player]\" - drone strike on your or player
@@ -19,22 +19,22 @@
   \"tp [player] here\" or \"tp to [player]\" or \"tp [player1] to [player2]\"
   \"plant\" - plant claymore where you stand"
   mode-presets "Gamemodes avialable:
-  domination - domminate 3 control points for summing points to your team
-  koth - dominate the control point for summing points to your team
-  push_waves - defend/attack a control point and if attacked succesfully, another control point will pop up. Respawns happen in waves
-  push_tickets - same thing but respawns hapen with tickets
-  none - no idea, its just in the API, if you happen to know what this is, please open an issue on the repo
-  example - same thing
-  tdm - team death match, each enemy kill is a point to your team
-  rtdm - randomized team death match, tdm but you spawn randomly and each 5 kills you get healed ;WIP not added yet"
-  maps "Maps avialale, self explanatory:
+  domination
+  koth
+  push_waves
+  push_tickets
+  none
+  example
+  tdm
+  rtdm ; not in API, also not included yet, check the repo if you want to know more"
+  maps "Maps avialale:
   demo_baseplate
   demo_claustrophobic_v3
   demo_claustrophobic_v4
   dl_shooting_range
   dl_afghanistan
   dl_shipment"
-  lighting-presets "Lighting presets avialable, self explanatory:
+  lighting-presets "Lighting presets avialable:
   blank
   foggy
   day
@@ -45,7 +45,7 @@
   demo_claustrophobic_lighting
   dl_afghanistan_morning
   dl_shipment"
-  camera-modes "Camera modes avialable, self explanatory:
+  camera-modes "Camera modes avialable:
   Default
   Freecam
   Frozen
@@ -90,7 +90,6 @@
 
 (function help-handle topic
   (match topic
-    null                cmds
     "modes"             mode-presets
     "maps"              maps
     "lighting-presets"  lighting-presets
@@ -101,8 +100,10 @@
 (function change-game mode (catch (eval (str "(dl.util.set_gamemode \"" mode "\")")) (dl.util.fmessage "Uknown gamemode"))) ;will use this simplified function until rtdm works
 (function change-maps maps (catch (eval (str "(dl.util.set_map \"" maps"\")")) (dl.util.fmessage "Uknown map")))
 (function change-lighting light (catch (eval (str "(dl.util.set_preset \"" light"\")")) (dl.util.fmessage "Uknown lighting preset")))
-(function change-camera mode player (catch (eval (str "(dl.players." player ".set_camera_mode \"" mode "\")")) (dl.util.fmessage "Uknown camera mode and/or uknown player")))
+(function change-camera mode player (let amode (str (upper-case (0 mode)) (sect mode))) (catch (eval (str "(dl.players." player ".set_camera_mode \"" amode "\")")) (dl.util.fmessage "Uknown camera mode and/or uknown player")))
 
+
+(function change-camera mode player (eval (str "(dl.players." player ".set_camera_mode \"" mode "\")")))
 ;rtdm, WIP
 
 ;(function rnd-spawn player (eval (str "dl.players." player ".position" ())))
@@ -218,6 +219,7 @@
   (var parts (split " " (lower-case msg))
        [_ b c d] parts)
   (match parts
+    ["cmds"]          cmds
     ["cmds" _]        (help-handle b)
     ["heal"]          (heal sender)
     ["heal" _]        (heal (n. b))
@@ -236,8 +238,9 @@
     ["plant"]         (plant sender)
     ["mode" _]        (change-game b)
     ["map" _]         (change-maps b)
-    ["light" _]       (change-lighting)
-    ["camera-mode" _ _] (change-camera b c)
+    ["light" _]       (change-lighting b)
+    ["camera" _ _]    (change-camera b (n. c))
+    ["camera" _]      (change-camera b sender)
     :not-a-command))
 
 (function fmessage m (print m) (dl.util.fmessage m))
@@ -248,9 +251,9 @@
     (fmessage
       (if (starts? "(" msg)
         (catch (eval msg) errors)
-        (or result "Didn't work, maybe player is dead.")))))
+        (or result "Didn't work, try again")))))
 
 (dl.events.on_chat_message.kill)
 (dl.events.on_chat_message.connect on-message)
 (dl.util.fmessage "Loaded Insitux chatbot! Chat \"cmds\" to see list of available commands.
-Note: this is a CHAT bot, you send the commands in the chat.")
+Note: this is a CHAT bot, you send the commands in the chat")
