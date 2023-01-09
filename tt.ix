@@ -26,7 +26,14 @@
   none - no idea, its just in the API, if you happen to know what this is, please open an issue on the repo
   example - same thing
   tdm - team death match, each enemy kill is a point to your team
-  rtdm - randomized team death match, tdm but you spawn randomly and each 5 kills you get healed ;not in the API"
+  rtdm - randomized team death match, tdm but you spawn randomly and each 5 kills you get healed ;WIP not added yet"
+  maps "Maps avialale, self explanatory:
+  demo_baseplate
+  demo_claustrophobic_v3
+  demo_claustrophobic_v4
+  dl_shooting_range
+  dl_afghanistan
+  dl_shipment"
   lighting-presets "Lighting presets avialable, self explanatory:
   blank
   foggy
@@ -81,14 +88,29 @@
       (prop evar))
     (print "plr errors: " errors)))
 
-(function change-game mode (catch (eval (str "(dl.util.set_gamemode \"" mode "\")")) (dl.util.fmessage "Uknown gamemode"))) ; add rtdm
+(function help-handle topic
+  (match topic
+    null                cmds
+    "modes"             mode-presets
+    "maps"              maps
+    "lighting-presets"  lighting-presets
+    "camera-modes"      camera-modes
+    _                   "not a topic"))
+
+;(function change-game mode ((= mode "rtdm") (rtdm) (catch (eval (str "(dl.util.set_gamemode \"" mode "\")")) (dl.util.fmessage "Uknown gamemode"))))
+(function change-game mode (catch (eval (str "(dl.util.set_gamemode \"" mode "\")")) (dl.util.fmessage "Uknown gamemode"))) ;will use this simplified function until rtdm works
 (function change-maps maps (catch (eval (str "(dl.util.set_map \"" maps"\")")) (dl.util.fmessage "Uknown map")))
 (function change-lighting light (catch (eval (str "(dl.util.set_preset \"" light"\")")) (dl.util.fmessage "Uknown lighting preset")))
 (function change-camera mode player (catch (eval (str "(dl.players." player ".set_camera_mode \"" mode "\")")) (dl.util.fmessage "Uknown camera mode and/or uknown player")))
 
-(function rtdm
-  (dl.util.set_gamemode "tdm")
-)
+;rtdm, WIP
+
+;(function rnd-spawn player (eval (str "dl.players." player ".position" ())))
+
+;(function rtdm
+;  (dl.util.set_gamemode "tdm")
+;  (dl.events.on_player_spawned.connect rnd-player)
+;)
 
 (function monologue messages delay
   (var d (or delay 1))
@@ -196,7 +218,7 @@
   (var parts (split " " (lower-case msg))
        [_ b c d] parts)
   (match parts
-    ["cmds"]          cmds
+    ["cmds" _]        (help-handle b)
     ["heal"]          (heal sender)
     ["heal" _]        (heal (n. b))
     ["team" _]        (team-cmd sender b)
